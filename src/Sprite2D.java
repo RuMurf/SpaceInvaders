@@ -23,7 +23,8 @@ public class Sprite2D {
     }
 
     public void paint(Graphics g) {
-        if (framesDrawn%100<50) g.drawImage(myImage, (int)x, (int)y, null);
+        if (framesDrawn%200<100) g.drawImage(myImage, (int)x, (int)y, null);
         else g.drawImage(myImage2, (int)x, (int)y, null);
+        framesDrawn++;
     }
 }

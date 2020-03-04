@@ -12,13 +12,14 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
     private BufferStrategy strategy;
     private Graphics offscreenBuffer;
     private static final int NUMALIENS = 30;
-    private Alien[] AliensArray = new Alien[NUMALIENS];
-    private Spaceship PlayerShip;
+    private Alien[] aliensArray = new Alien[NUMALIENS];
+    private Spaceship playerShip;
     private Image bulletImage;
     private ArrayList bulletsList = new ArrayList();
     private boolean isInitialized = false;
     private static String workingDirectory;
-    private boolean isGameInProgress = false;
+    private boolean gameInProgress = false;
+    private boolean mainMenu = true;
     private int enemyWave = 1;
     private int score = 0;
     private int highscore = 0;
@@ -43,13 +44,13 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
 
         //create and initialize aliens
         for (int i = 0; i < NUMALIENS; i++) {
-            AliensArray[i] = new Alien(alienImage, alienImage2);
+            aliensArray[i] = new Alien(alienImage, alienImage2);
         }
 
         //create and initialize spaceship
         icon = new ImageIcon(workingDirectory + "\\images\\player_ship.png");
         Image shipImage = icon.getImage();
-        PlayerShip = new Spaceship(shipImage, bulletImage);
+        playerShip = new Spaceship(shipImage, bulletImage);
 
         //create and start animation thread
         Thread t = new Thread(this);
@@ -71,34 +72,31 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
         while(true){
             //1: sleep for 1/50 second
             try {
-                Thread.sleep(20);
+                Thread.sleep(5);
             } catch (InterruptedException e){}
 
             //2: animate game objects if game is in progress
-            if (isGameInProgress) {
+            if (gameInProgress) {
                 boolean anyAliensAlive = false;
                 boolean alienDirectionReversalNeeded = false;
                 for (int i = 0; i < NUMALIENS; i++) {
-                    if (AliensArray[i].isAlive) {
+                    if (aliensArray[i].isAlive) {
                         anyAliensAlive = true;
-                        if (AliensArray[i].move()) {
+                        if (aliensArray[i].move()) {
                             alienDirectionReversalNeeded = true;
                         }
 
                         //check for alien collision with ship (game over)
-                        //need to pass objects into function instead of dimensions
-                        if (isCollision(PlayerShip.x, AliensArray[i].x,PlayerShip.y, AliensArray[i].y, 54, 50, 32,32)) {
-                            isGameInProgress = false;
-                        }
+                        if (collision(playerShip, aliensArray[i])) gameInProgress = false;
                     }
                 }
                 if (alienDirectionReversalNeeded) {
                     for (int i = 0; i < NUMALIENS; i++) {
-                        if (AliensArray[i].isAlive) {
-                            AliensArray[i].reverseDirection();
+                        if (aliensArray[i].isAlive) {
+                            aliensArray[i].reverseDirection();
                             //if passed bottom of screen, game over
-                            if (AliensArray[i].y > WindowSize.height - 20) {
-                                isGameInProgress = false;
+                            if (aliensArray[i].y > WindowSize.height - 20) {
+                                gameInProgress = false;
                             }
                         }
                     }
@@ -107,24 +105,22 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
                     enemyWave++;
                     startNewWave();
                 }
-                PlayerShip.move();
+                playerShip.move();
 
                 Iterator iterator = bulletsList.iterator();
                 while(iterator.hasNext()) {
-                    Bullet b = (Bullet) iterator.next();
-                    if (b.move()) {
+                    Bullet bullet = (Bullet) iterator.next();
+                    if (bullet.move()) {
                         //move returns true if bullet goes offscreen
                         iterator.remove();
                     }
                     else {
                         //check for collision between bullet and aliens
-                        double x2 = b.x, y2 = b.y, w1 = AliensArray[0].myImage.getWidth(null), h1 = AliensArray[0].myImage.getHeight(null), w2 = bulletImage.getWidth(null), h2 = bulletImage.getHeight(null);
                         for (int i = 0; i < NUMALIENS; i++) {
-                            if (AliensArray[i].isAlive) {
-                                double x1 = AliensArray[i].x, y1 = AliensArray[i].y;
-                                if (isCollision(x1, x2, y1, y2, w1, w2, h1, h2)) {
+                            if (aliensArray[i].isAlive) {
+                                if (collision(aliensArray[i], bullet)) {
                                     //destroy alien and bullet
-                                    AliensArray[i].isAlive = false;
+                                    aliensArray[i].isAlive = false;
                                     iterator.remove();
                                     score += 10;
                                     if (score > highscore) highscore = score;
@@ -145,22 +141,24 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
     }
 
     public void keyPressed(KeyEvent e) {
-        if (isGameInProgress) {
-            if (e.getKeyCode() == KeyEvent.VK_LEFT) PlayerShip.setXSpeed(-4);
-            if (e.getKeyCode() == KeyEvent.VK_RIGHT) PlayerShip.setXSpeed(4);
-            if (e.getKeyCode() == KeyEvent.VK_SPACE) bulletsList.add(PlayerShip.shootBullet());
+        if (gameInProgress) {
+            if (e.getKeyCode() == KeyEvent.VK_LEFT) playerShip.setXSpeed(-4);
+            if (e.getKeyCode() == KeyEvent.VK_RIGHT) playerShip.setXSpeed(4);
+            if (e.getKeyCode() == KeyEvent.VK_SPACE) bulletsList.add(playerShip.shootBullet());
         }
         else startNewGame();
     }
 
     public void keyReleased(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.VK_LEFT || e.getKeyCode() == KeyEvent.VK_RIGHT) PlayerShip.setXSpeed(0);
+        if (e.getKeyCode() == KeyEvent.VK_LEFT || e.getKeyCode() == KeyEvent.VK_RIGHT) playerShip.setXSpeed(0);
     }
 
     public void startNewGame() {
+        mainMenu = false;
         enemyWave = 1;
         score = 0;
-        isGameInProgress = true;
+        gameInProgress = true;
+        playerShip.setPosition(300, 530);
         startNewWave();
     }
 
@@ -168,16 +166,17 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
         //reposition aliens and player ship
         for (int i = 0; i < NUMALIENS; i++) {
             double xx = (i%5) * 80 + 70;
-            double yy = (i/5) * 40 + 50;
-            AliensArray[i].setPosition(xx, yy);
-            AliensArray[i].setXSpeed(1+enemyWave);
-            AliensArray[i].framesDrawn = 0;
-            AliensArray[i].isAlive = true;
+            double yy = (i/5) * 40 + 70;
+            aliensArray[i].setPosition(xx, yy);
+            aliensArray[i].setXSpeed(0.1+enemyWave);
+            aliensArray[i].framesDrawn = 0;
+            aliensArray[i].isAlive = true;
         }
-        //PlayerShip.setPosition(300, 530);
     }
 
-    private boolean isCollision(double x1, double x2, double y1, double y2, double w1, double w2, double h1, double h2) {
+    private boolean collision(Sprite2D object1, Sprite2D object2) {
+        double x1 = object1.x, y1 = object1.y, w1 = object1.myImage.getWidth(null), h1 = object1.myImage.getHeight(null);
+        double x2 = object2.x, y2 = object2.y, w2 = object2.myImage.getWidth(null), h2 = object2.myImage.getHeight(null);
         if (((x1<x2 && x1+w1>x2) || (x2<x1 && x2+w2>x1) ) && ((y1<y2 && y1+h1>y2) || (y2<y1 && y2+h2>y1))) return true;
         else return false;
     }
@@ -200,13 +199,13 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
         g.setColor(Color.BLACK);
         g.fillRect(0, 0, WindowSize.width, WindowSize.height);
 
-        if (isGameInProgress) {
+        if (gameInProgress) {
             //redraw all game objects
             for (int i = 0; i < NUMALIENS; i++) {
-                AliensArray[i].paint(g);
+                aliensArray[i].paint(g);
             }
 
-            PlayerShip.paint(g);
+            playerShip.paint(g);
 
             Iterator iterator = bulletsList.iterator();
             while (iterator.hasNext()) {
@@ -214,10 +213,17 @@ public class InvadersApplication extends JFrame implements Runnable, KeyListener
                 b.paint(g);
             }
 
-            //score
+            //print score
             g.setColor(Color.WHITE);
             writeString(g, WindowSize.width / 2, 60, 30, "Score: " + score + "    Best: " + highscore);
-        } else { //redraw the menu screen
+        }
+        else if (mainMenu) {
+            g.setColor(Color.WHITE);
+            writeString(g, WindowSize.width / 2, 200, 60, "SPACE INVADERS!");
+            writeString(g, WindowSize.width / 2, 300, 30, "Press any key to play");
+            writeString(g, WindowSize.width / 2, 350, 25, "[Arrow keys to move, space to fire]");
+        }
+        else { //redraw the menu screen
             g.setColor(Color.WHITE);
             writeString(g, WindowSize.width / 2, 200, 60, "GAME OVER");
             writeString(g, WindowSize.width / 2, 300, 30, "Press any key to play");

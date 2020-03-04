@@ -6,7 +6,7 @@ public class Bullet extends Sprite2D {
     }
 
     public boolean move() {
-        y -= 10;
+        y -= 5;
         return (y < 0); //return true if bullet is offscreen and needs destroying
     }
 }
